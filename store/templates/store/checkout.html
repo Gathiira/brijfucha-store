@@ -1,0 +1,199 @@
+{% extends 'store/main.html' %}
+
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6">
+        <div class="box-element">
+            <a class="btn btn-outline-dark" href="{% url 'cart' %}">&#8592; Back to Cart </a>
+            <hr>
+            <h3>Order Summary</h3>
+            <hr>
+            {% for item in items %}
+            <div class="cart-row">
+                <div style="flex: 2;"><img class="row-image" src="{{ item.product.imageUrl }}" alt=""></div>
+                <div style="flex: 2">{{item.product.product_name }}</div>
+                <div style="flex: 1">${{item.product.price| floatformat:2}}</div>
+                <div style="flex: 1">x{{ item.order_quantity }}</div>
+            </div>
+            {% endfor %}
+            <h5>Items : {{ order.get_cart_items }}</h5>
+            <h5>Totals : ${{ order.get_cart_total| floatformat:2 }}</h5>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="box-element" id="form-wrapper">
+            <form action="" id="form"> {% csrf_token %}
+                <div id="user-info">
+                    <div class="form-field">
+                        <input required type="text" name="name" class="form-control" placeholder="Name...">
+                    </div>
+                    <div class="form-field">
+                        <input required type="email" name="email" class="form-control" placeholder="Email...">
+                    </div>
+                </div>
+                <hr>
+                <div id="shipping-info">
+                    <hr>
+                    <p>Shipping Information</p>
+                    <hr>
+                    <div class="form-field">
+                        <input required type="text" name="address" class="form-control" placeholder="Address...">
+                    </div>
+                    <div class="form-field">
+                        <input required type="text" name="county" class="form-control" placeholder="County...">
+                    </div>
+                    <div class="form-field">
+                        <input required type="text" name="town" class="form-control" placeholder="Town...">
+                    </div>
+                    <div class="form-field">
+                        <input required type="text" name="phone" class="form-control" placeholder="Phone...">
+                    </div>
+                </div>
+                <hr>
+                <input type="submit" id="form-button" class="btn btn-success btn-block" value="Continue">
+            </form>
+
+        </div>
+        <br>
+        <div class="box-element hidden" id="payment-info">
+            <small>Payment options</small>
+            <button class="btn btn-success btn-block" id="mpesa-payment">Mpesa</button>
+            <br>
+            <!-- Set up a container element for the button -->
+            <div id="paypal-button-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Include the PayPal JavaScript SDK -->
+<script src="https://www.paypal.com/sdk/js?client-id=AbqMijub32PQk9_1H_8NoXVc-Uw8lhIEuHktrFKZKOZ9RU3E2cM3rAN_1Z5cfrfNhH3Cd_x2IxnyGDvu&currency=USD&disable-funding=credit"></script>
+
+<script>
+    var total = '{{ order.get_cart_total }}'
+
+    // Render the PayPal button into #paypal-button-container
+    paypal.Buttons({
+
+        style: {
+            color:  'blue',
+            shape:  'rect',
+            label:  'pay',
+            height: 40
+        },
+
+        // Set up the transaction
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{
+                    amount: {
+                        value: parseFloat(total).toFixed(2)
+                    }
+                }]
+            });
+        },
+
+        // Finalize the transaction
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function(details) {
+                submitFormData()
+            });
+        }
+
+
+    }).render('#paypal-button-container');
+</script>
+
+<script type="text/javascript">
+    var shipping = '{{ order.shipping }}'
+    var total = '{{ order.get_cart_total }}'
+
+    console.log('shipping value :', shipping)
+    if (shipping == 'False'){
+        document.getElementById('shipping-info').innerHTML = ''
+    }
+
+    if (user != 'AnonymousUser'){
+        document.getElementById('user-info').innerHTML = ''
+    }
+
+    if (shipping == 'False' && user != 'AnonymousUser'){
+        // hide the entire form if the user is logged in and shipping is false
+        document.getElementById('form-wrapper').classList.add('hidden')
+        // show payment info if logged in user wants to buy an item that does not require shipping
+        document.getElementById('payment-info').classList.remove('hidden')
+
+    }
+
+    var form = document.getElementById('form')
+    csrftoken = form.getElementsByTagName('input')[0].value
+    console.log('New token :', csrftoken)
+
+    form.addEventListener('submit', function(e){
+        e.preventDefault()
+        console.log('Form submitted .....')
+
+        document.getElementById('form-button').classList.add('hidden');
+        document.getElementById('payment-info').classList.remove('hidden');
+    })
+ 
+    // make payment button click handler
+    /*
+    document.getElementById('mpesa-payment').addEventListener('click', function(e){
+        location.href='{% url 'mpesa_payment' %}'
+    })
+    */
+
+    function submitFormData(){
+        console.log('payment button clicked')
+
+        var userFormData = {
+            'name':null,
+            'email':null,
+            'total':total,
+        }
+
+        var shippingInfo = {
+            'address':null,
+            'county':null,
+            'town':null,
+            'phone':null,
+        }
+
+        if (shipping != 'False'){
+            shippingInfo.address = form.address.value
+            shippingInfo.county = form.county.value
+            shippingInfo.town = form.town.value
+            shippingInfo.phone = form.phone.value
+        }
+        if (user == 'AnonymousUser'){
+            userFormData.name = form.name.value
+            shippingInfo.email = form.email.value
+        }
+
+        var url = '/process_order/'
+
+        fetch(url, {
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                'X-CSRFToken':csrftoken,
+            },
+            body:JSON.stringify({'form':userFormData, 'shipping':shippingInfo}),
+        })
+        .then((response) => {
+            return response.json();
+        })
+        .then((data) => {
+            console.log('Success! :', data);
+            alert('Transaction complete!!');
+
+            cart = {}
+            document.cookie = 'cart=' + JSON.stringify(cart) + ';domain=;path=/'
+
+            window.location.href = "{% url 'store'%}";
+        })
+    }
+</script>
+{% endblock %}
