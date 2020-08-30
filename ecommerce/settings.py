@@ -29,7 +29,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = False
 
 # ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ['brijfyucha-store.herokuapp.com','.herokuapp.com','127.0.0.1']
+ALLOWED_HOSTS = ['brijfyucha-store.herokuapp.com','.herokuapp.com']
 
 
 # Application definition
